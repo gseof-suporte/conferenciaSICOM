@@ -5,20 +5,19 @@
 # =========================================
 # PACOTES
 # =========================================
-packages <- c("shiny", "bslib", "shinyWidgets", "DT",
-              "shinythemes", "dplyr", "stringr", "readxl", "readr",
-              "tidyverse", "data.table", "tibble", "tidyr", "purrr",
-              "openxlsx", "stringi", "scales")
+# =========================================
+# PACOTES
+# =========================================
+packages <- c("shiny", "bslib", "shinyWidgets", "DT")
 
-for (pkg in packages) {
-  if (!requireNamespace(pkg, quietly = TRUE)) {
-    install.packages(pkg, repos = "https://cloud.r-project.org")
-  }
-  if (!requireNamespace(pkg, quietly = TRUE)) {
-    stop(paste("Não foi possível instalar o pacote:", pkg))
-  }
-  library(pkg, character.only = TRUE)
+# Instala SOMENTE pacotes que ainda NÃO estão instalados na máquina
+new_pkgs <- packages[!(packages %in% installed.packages()[,"Package"])]
+if (length(new_pkgs) > 0) {
+  install.packages(new_pkgs, dependencies = TRUE, repos = "https://cloud.r-project.org")
 }
+
+# Carrega os pacotes com segurança
+invisible(lapply(packages, library, character.only = TRUE))
 
 # =========================================
 # UI (INTERFACE DO USUÁRIO)
