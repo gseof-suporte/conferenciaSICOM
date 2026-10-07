@@ -2,22 +2,22 @@
 # APP MESTRE - CONFERÊNCIA SICOM
 # =========================================
 
-# =========================================
-# PACOTES
-# =========================================
-# =========================================
-# PACOTES
-# =========================================
-packages <- c("shiny", "bslib", "shinyWidgets", "DT")
+# 1. PACOTES (Mestre + Todos os Sub-Apps)
+packages_needed <- c(
+  "shiny", "bslib", "shinyWidgets", "DT", 
+  "readxl", "dplyr", "data.table", "shinythemes", 
+  "stringr", "openxlsx", "tools", "readr", "tidyr", "stringi"
+)
 
-# Instala SOMENTE pacotes que ainda NÃO estão instalados na máquina
-new_pkgs <- packages[!(packages %in% installed.packages()[,"Package"])]
+# Instala apenas os pacotes ausentes no computador do usuário
+new_pkgs <- packages_needed[!(packages_needed %in% installed.packages()[,"Package"])]
 if (length(new_pkgs) > 0) {
   install.packages(new_pkgs, dependencies = TRUE, repos = "https://cloud.r-project.org")
 }
 
-# Carrega os pacotes com segurança
-invisible(lapply(packages, library, character.only = TRUE))
+# Carrega todos os pacotes de uma só vez
+invisible(lapply(packages_needed, library, character.only = TRUE))
+
 
 # =========================================
 # UI (INTERFACE DO USUÁRIO)
@@ -33,6 +33,7 @@ ui <- page_navbar(
   
   nav_panel(
     title = "Menu Principal",
+    value = "menu_principal",
     icon = icon("th-large"),
     
     tags$div(
@@ -59,12 +60,6 @@ ui <- page_navbar(
           font-weight: bold;
           font-size: 2.2rem;
           color: #2c3e50;
-        }
-
-        .disabled-card {
-          opacity: 0.4;
-          cursor: not-allowed;
-          background-color: #f9f9f9;
         }
       ")),
       
@@ -93,248 +88,67 @@ ui <- page_navbar(
 # =========================================
 server <- function(input, output, session) {
   
-  conteudo_app <- reactiveValues(
-    ui = NULL,
-    server = NULL
-  )
+  app_atual <- reactiveVal(NULL)
   
-  # =========================================
-  # MENU PRINCIPAL
-  # =========================================
+  # Menu Principal
   output$ui_menu_dinamico <- renderUI({
-    
     tagList(
-      
       fluidRow(
-        
-        column(
-          4,
-          actionLink(
-            inputId = "btn_ntf",
-            label = bslib::card(
-              class = "card-menu",
-              tags$span(
-                class = "card-title-custom",
-                "NTF"
-              )
-            )
-          )
-        ),
-        
-        column(
-          4,
-          actionLink(
-            inputId = "btn_anl",
-            label = bslib::card(
-              class = "card-menu",
-              tags$span(
-                class = "card-title-custom",
-                "ANL"
-              )
-            )
-          )
-        ),
-        
-        column(
-          4,
-          actionLink(
-            inputId = "btn_lqd",
-            label = bslib::card(
-              class = "card-menu",
-              tags$span(
-                class = "card-title-custom",
-                "LQD"
-              )
-            )
-          )
-        )
+        column(4, actionLink("btn_ntf", label = bslib::card(class = "card-menu", tags$span(class = "card-title-custom", "NTF")))),
+        column(4, actionLink("btn_anl", label = bslib::card(class = "card-menu", tags$span(class = "card-title-custom", "ANL")))),
+        column(4, actionLink("btn_lqd", label = bslib::card(class = "card-menu", tags$span(class = "card-title-custom", "LQD"))))
       ),
-      
       br(),
-      
       fluidRow(
-        
-        column(
-          4,
-          actionLink(
-            inputId = "btn_emp",
-            label = bslib::card(
-              class = "card-menu",
-              tags$span(
-                class = "card-title-custom",
-                "EMP"
-              )
-            )
-          )
-        ),
-        
-        column(
-          4,
-          actionLink(
-            inputId = "btn_alq",
-            label = bslib::card(
-              class = "card-menu",
-              tags$span(
-                class = "card-title-custom",
-                "ALQ"
-              )
-            )
-          )
-        ),
-        
-        column(
-          4,
-          actionLink(
-            inputId = "btn_orgao",
-            label = bslib::card(
-              class = "card-menu",
-              tags$span(
-                class = "card-title-custom",
-                "ÓRGÃO"
-              )
-            )
-          )
-        )
+        column(4, actionLink("btn_emp", label = bslib::card(class = "card-menu", tags$span(class = "card-title-custom", "EMP")))),
+        column(4, actionLink("btn_alq", label = bslib::card(class = "card-menu", tags$span(class = "card-title-custom", "ALQ")))),
+        column(4, actionLink("btn_orgao", label = bslib::card(class = "card-menu", tags$span(class = "card-title-custom", "ÓRGÃO"))))
       )
     )
   })
   
-  # =========================================
-  # FUNÇÃO PARA CARREGAR OS SUB-APPS
-  # =========================================
-  carregar_sub_app <- function(arquivo) {
+  # Função para abrir os sub-apps de forma nativa e integrada
+  carregar_sub_app <- function(caminho_arquivo) {
+    if (!file.exists(caminho_arquivo)) {
+      showNotification(paste("Arquivo não encontrado:", caminho_arquivo), type = "error")
+      return()
+    }
     
-    temp_env <- new.env(parent = globalenv())
-    
-    tryCatch({
-      
-      if (!file.exists(arquivo)) {
-        stop(
-          paste0(
-            "Arquivo não encontrado: ",
-            arquivo
-          )
-        )
-      }
-      
-      source(
-        arquivo,
-        local = temp_env
-      )
-      
-      if (!exists("ui", envir = temp_env)) {
-        stop(
-          paste0(
-            "O arquivo ",
-            arquivo,
-            " não possui o objeto 'ui'."
-          )
-        )
-      }
-      
-      if (!exists("server", envir = temp_env)) {
-        stop(
-          paste0(
-            "O arquivo ",
-            arquivo,
-            " não possui o objeto 'server'."
-          )
-        )
-      }
-      
-      conteudo_app$ui <- temp_env$ui
-      conteudo_app$server <- temp_env$server
-      
-      updateNavbarPage(
-        session = session,
-        inputId = "main_nav",
-        selected = "painel_exec"
-      )
-      
-      conteudo_app$server(
-        input,
-        output,
-        session
-      )
-      
+    app_obj <- tryCatch({
+      # Executa o arquivo app.R / appEMP.R / etc. diretamente
+      source(caminho_arquivo, local = TRUE)$value
     }, error = function(e) {
-      
-      # =========================================
-      # NÃO EXIBE POP-UP DE ERRO
-      # =========================================
-      # O erro continua sendo registrado no
-      # Console do R/RStudio para diagnóstico.
-      
-      message(
-        paste(
-          "ERRO NO ARQUIVO:",
-          arquivo,
-          "-",
-          e$message
-        )
-      )
-      
+      message("Erro ao carregar ", caminho_arquivo, ": ", e$message)
+      showNotification(paste("Erro ao carregar o módulo:", e$message), type = "error")
+      return(NULL)
     })
+    
+    if (!is.null(app_obj)) {
+      app_atual(app_obj)
+      updateNavbarPage(session, "main_nav", selected = "painel_exec")
+    }
   }
   
-  # =========================================
-  # BOTÕES DO MENU PRINCIPAL
-  # =========================================
+  # Eventos dos Botões do Menu
+  observeEvent(input$btn_ntf,   { carregar_sub_app("app.R") })
+  observeEvent(input$btn_anl,   { carregar_sub_app("appanl.R") })
+  observeEvent(input$btn_lqd,   { carregar_sub_app("appLQD.R") })
+  observeEvent(input$btn_emp,   { carregar_sub_app("appEMP.R") })
+  observeEvent(input$btn_alq,   { carregar_sub_app("appALQ.R") })
+  observeEvent(input$btn_orgao, { carregar_sub_app("appORGAO.R") })
   
-  observeEvent(input$btn_ntf, {
-    carregar_sub_app("app.R")
-  })
-  
-  observeEvent(input$btn_anl, {
-    carregar_sub_app("appanl.R")
-  })
-  
-  observeEvent(input$btn_lqd, {
-    carregar_sub_app("appLQD.R")
-  })
-  
-  observeEvent(input$btn_emp, {
-    carregar_sub_app("appEMP.R")
-  })
-  
-  observeEvent(input$btn_alq, {
-    carregar_sub_app("appALQ.R")
-  })
-  
-  observeEvent(input$btn_orgao, {
-    carregar_sub_app("appORGAO.R")
-  })
-  
-  # =========================================
-  # BOTÃO VOLTAR
-  # =========================================
+  # Botão Voltar
   observeEvent(input$voltar, {
-    
-    conteudo_app$ui <- NULL
-    conteudo_app$server <- NULL
-    
-    updateNavbarPage(
-      session = session,
-      inputId = "main_nav",
-      selected = "Menu Principal"
-    )
+    app_atual(NULL)
+    updateNavbarPage(session, "main_nav", selected = "menu_principal")
   })
   
-  # =========================================
-  # UI DO SUB-APP CARREGADO
-  # =========================================
+  # Renderização do Sub-App Selecionado
   output$ui_dinamica <- renderUI({
-    
-    req(conteudo_app$ui)
-    
-    conteudo_app$ui
+    req(app_atual())
+    app_atual()
   })
 }
 
-# =========================================
-# EXECUTA APP
-# =========================================
-shinyApp(
-  ui = ui,
-  server = server
-)
+# Executa a Aplicação
+shinyApp(ui = ui, server = server)
